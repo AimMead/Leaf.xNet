@@ -30,7 +30,7 @@ namespace Leaf.Net
 
         #region Статические поля (внутренние)
 
-        internal static readonly Dictionary<HttpHeader, string> Headers = new Dictionary<HttpHeader, string>()
+        internal static readonly Dictionary<HttpHeader, string> Headers = new Dictionary<HttpHeader, string>
         {
             { HttpHeader.Accept, "Accept" },
             { HttpHeader.AcceptCharset, "Accept-Charset" },
@@ -84,22 +84,14 @@ namespace Leaf.Net
         #region Статические поля (закрытые)
 
         [ThreadStatic] private static Random _rand;
-        private static Random Rand
-        {
-            get
-            {
-                if (_rand == null)
-                    _rand = new Random();
-                return _rand;
-            }
-        }
+        private static Random Rand => _rand ?? (_rand = new Random());
 
         #endregion
 
 
         static Http()
         {
-            AcceptAllCertificationsCallback = new RemoteCertificateValidationCallback(AcceptAllCertifications);
+            AcceptAllCertificationsCallback = AcceptAllCertifications;
         }
 
 
@@ -120,7 +112,7 @@ namespace Leaf.Net
 
             encoding = encoding ?? Encoding.UTF8;
 
-            byte[] bytes = encoding.GetBytes(str);
+            var bytes = encoding.GetBytes(str);
 
             int spaceCount = 0;
             int otherCharCount = 0;
@@ -144,31 +136,26 @@ namespace Leaf.Net
             #endregion
 
             // Если в строке не присутствуют символы, которые нужно закодировать.
-            if ((spaceCount == 0) && (otherCharCount == 0))
-            {
+            if (spaceCount == 0 && otherCharCount == 0)
                 return str;
-            }
 
-            int bufferIndex = 0;
-            byte[] buffer = new byte[bytes.Length + (otherCharCount * 2)];
+            var bufferIndex = 0;
+            var buffer = new byte[bytes.Length + (otherCharCount * 2)];
 
+            // ReSharper disable once ForCanBeConvertedToForeach
             for (int i = 0; i < bytes.Length; i++)
             {
                 char c = (char)bytes[i];
 
                 if (IsUrlSafeChar(c))
-                {
                     buffer[bufferIndex++] = bytes[i];
-                }
                 else if (c == ' ')
-                {
-                    buffer[bufferIndex++] = (byte)'+';
-                }
+                    buffer[bufferIndex++] = (byte) '+';
                 else
                 {
-                    buffer[bufferIndex++] = (byte)'%';
-                    buffer[bufferIndex++] = (byte)IntToHex((bytes[i] >> 4) & 15);
-                    buffer[bufferIndex++] = (byte)IntToHex(bytes[i] & 15);
+                    buffer[bufferIndex++] = (byte) '%';
+                    buffer[bufferIndex++] = (byte) IntToHex((bytes[i] >> 4) & 15);
+                    buffer[bufferIndex++] = (byte) IntToHex(bytes[i] & 15);
                 }
             }
 
@@ -185,12 +172,8 @@ namespace Leaf.Net
         public static string ToQueryString(IEnumerable<KeyValuePair<string, string>> parameters, bool dontEscape)
         {
             #region Проверка параметров
-
             if (parameters == null)
-            {
-                throw new ArgumentNullException("parameters");
-            }
-
+                throw new ArgumentNullException(nameof(parameters));
             #endregion
 
             var queryBuilder = new StringBuilder();
@@ -198,31 +181,18 @@ namespace Leaf.Net
             foreach (var param in parameters)
             {
                 if (string.IsNullOrEmpty(param.Key))
-                {
                     continue;
-                }
 
                 queryBuilder.Append(param.Key);
                 queryBuilder.Append('=');
 
-                if (dontEscape)
-                {
-                    queryBuilder.Append(param.Value);
-                }
-                else
-                {
-                    queryBuilder.Append(
-                        Uri.EscapeDataString(param.Value ?? string.Empty));
-                }
-
+                queryBuilder.Append(dontEscape ? param.Value : Uri.EscapeDataString(param.Value ?? string.Empty));
                 queryBuilder.Append('&');
             }
 
+            // Удаляем '&' в конце.
             if (queryBuilder.Length != 0)
-            {
-                // Удаляем '&' в конце.
                 queryBuilder.Remove(queryBuilder.Length - 1, 1);
-            }
 
             return queryBuilder.ToString();
         }
@@ -238,11 +208,8 @@ namespace Leaf.Net
         public static string ToPostQueryString(IEnumerable<KeyValuePair<string, string>> parameters, bool dontEscape, Encoding encoding = null)
         {
             #region Проверка параметров
-
             if (parameters == null)
-            {
-                throw new ArgumentNullException("parameters");
-            }
+                throw new ArgumentNullException(nameof(parameters));
 
             #endregion
 
@@ -251,31 +218,18 @@ namespace Leaf.Net
             foreach (var param in parameters)
             {
                 if (string.IsNullOrEmpty(param.Key))
-                {
                     continue;
-                }
 
                 queryBuilder.Append(param.Key);
                 queryBuilder.Append('=');
 
-                if (dontEscape)
-                {
-                    queryBuilder.Append(param.Value);
-                }
-                else
-                {
-                    queryBuilder.Append(
-                        UrlEncode(param.Value ?? string.Empty, encoding));
-                }
-
+                queryBuilder.Append(dontEscape ? param.Value : UrlEncode(param.Value ?? string.Empty, encoding));
                 queryBuilder.Append('&');
             }
 
-            if (queryBuilder.Length != 0)
-            {
-                // Удаляем '&' в конце.
+            // Удаляем '&' в конце.
+            if (queryBuilder.Length != 0)                
                 queryBuilder.Remove(queryBuilder.Length - 1, 1);
-            }
 
             return queryBuilder.ToString();
         }
@@ -360,7 +314,7 @@ namespace Leaf.Net
                         mozillaVersion = "5.0";
                         break;
 
-                    case 2:
+                    default:
                         version = "11.0";
                         trident = "7.0";
                         mozillaVersion = "5.0";
@@ -372,8 +326,7 @@ namespace Leaf.Net
 
             #endregion
 
-            return
-                $"Mozilla/{mozillaVersion} (compatible; MSIE {version}; {windowsVersion}; Trident/{trident}; {otherParams})";
+            return $"Mozilla/{mozillaVersion} (compatible; MSIE {version}; {windowsVersion}; Trident/{trident}; {otherParams})";
         }
 
         /// <summary>
@@ -382,8 +335,8 @@ namespace Leaf.Net
         /// <returns>Случайный User-Agent от браузера Opera.</returns>
         public static string OperaUserAgent()
         {
-            string version = null;
-            string presto = null;
+            string version;
+            string presto;
 
             #region Генерация случайной версии
 
@@ -404,7 +357,7 @@ namespace Leaf.Net
                     presto = "2.10.289";
                     break;
 
-                case 3:
+                default:
                     version = "12.00";
                     presto = "2.10.181";
                     break;
@@ -421,8 +374,8 @@ namespace Leaf.Net
         /// <returns>Случайный User-Agent от браузера Chrome.</returns>
         public static string ChromeUserAgent()
         {
-            string version = null;
-            string safari = null;
+            string version;
+            string safari;
 
             #region Генерация случайной версии
 
@@ -448,7 +401,7 @@ namespace Leaf.Net
                     safari = "537.36";
                     break;
 
-                case 4:
+                default:
                     version = "41.0.2226.0";
                     safari = "537.36";
                     break;
@@ -456,8 +409,7 @@ namespace Leaf.Net
 
             #endregion
 
-            return
-                $"Mozilla/5.0 ({RandomWindowsVersion()}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version} Safari/{safari}";
+            return $"Mozilla/5.0 ({RandomWindowsVersion()}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version} Safari/{safari}";
         }
 
         /// <summary>
@@ -466,8 +418,8 @@ namespace Leaf.Net
         /// <returns>Случайный User-Agent от браузера Firefox.</returns>
         public static string FirefoxUserAgent()
         {
-            string gecko = null;
-            string version = null;
+            string gecko;
+            string version;
 
             #region Генерация случайной версии
 
@@ -493,7 +445,7 @@ namespace Leaf.Net
                     gecko = "20120101";
                     break;
 
-                case 4:
+                default:
                     version = "28.0";
                     gecko = "20100101";
                     break;
@@ -501,9 +453,7 @@ namespace Leaf.Net
 
             #endregion
 
-            return string.Format(
-                "Mozilla/5.0 ({0}; rv:{1}) Gecko/{2} Firefox/{1}",
-                RandomWindowsVersion(), version, gecko);
+            return $"Mozilla/5.0 ({RandomWindowsVersion()}; rv:{version}) Gecko/{gecko} Firefox/{version}";
         }
 
         /// <summary>
@@ -512,10 +462,10 @@ namespace Leaf.Net
         /// <returns>Случайный User-Agent от мобильного браузера Opera.</returns>
         public static string OperaMiniUserAgent()
         {
-            string os = null;
-            string miniVersion = null;
-            string version = null;
-            string presto = null;
+            string os;
+            string miniVersion;
+            string version;
+            string presto;
 
             #region Генерация случайной версии
 
@@ -535,7 +485,7 @@ namespace Leaf.Net
                     presto = "2.10.181";
                     break;
 
-                case 2:
+                default:
                     os = "Android";
                     miniVersion = "7.5.54678";
                     version = "12.02";
@@ -558,19 +508,17 @@ namespace Leaf.Net
         private static bool AcceptAllCertifications(object sender,
             System.Security.Cryptography.X509Certificates.X509Certificate certification,
             System.Security.Cryptography.X509Certificates.X509Chain chain,
-            System.Net.Security.SslPolicyErrors sslPolicyErrors)
+            SslPolicyErrors sslPolicyErrors)
         {
             return true;
         }
 
         private static bool IsUrlSafeChar(char c)
         {
-            if ((((c >= 'a') && (c <= 'z')) ||
-                ((c >= 'A') && (c <= 'Z'))) ||
-                ((c >= '0') && (c <= '9')))
-            {
+            if ((c >= 'a' && c <= 'z') ||
+                (c >= 'A' && c <= 'Z') ||
+                (c >= '0' && c <= '9'))
                 return true;
-            }
 
             switch (c)
             {
@@ -582,19 +530,14 @@ namespace Leaf.Net
                 case '_':
                 case '!':
                     return true;
+                default:
+                    return false;
             }
-
-            return false;
         }
 
         private static char IntToHex(int i)
         {
-            if (i <= 9)
-            {
-                return (char)(i + 48);
-            }
-
-            return (char)((i - 10) + 65);
+            return i <= 9 ? (char) (i + 48) : (char) (i - 10 + 65);
         }
 
         private static string RandomWindowsVersion()
@@ -612,18 +555,24 @@ namespace Leaf.Net
                     break;
 
                 case 2:
-                    windowsVersion += "6.1"; // Windows 7
+                    windowsVersion += "6.1"; // Windows 7 / Server 2008 RC 2
                     break;
 
                 case 3:
-                    windowsVersion += "6.2"; // Windows 8
+                    windowsVersion += "6.2"; // Windows 8 / Server 2012
+                    break;
+
+                case 4:
+                    windowsVersion += "6.3"; // Windows 8.1 / Server 2012 RC 2
+                    break;
+
+                default:
+                    windowsVersion += "10.0"; // Windows 10 / Server 2016
                     break;
             }
 
             if (Rand.NextDouble() < 0.2)
-            {
                 windowsVersion += "; WOW64"; // 64-битная версия.
-            }
 
             return windowsVersion;
         }

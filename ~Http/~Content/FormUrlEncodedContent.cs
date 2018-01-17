@@ -22,19 +22,17 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (content == null)
-            {
-                throw new ArgumentNullException("content");
-            }
+                throw new ArgumentNullException(nameof(content));
 
             #endregion
 
             string queryString = Http.ToPostQueryString(content, dontEscape, encoding);
 
-            _content = Encoding.ASCII.GetBytes(queryString);
-            _offset = 0;
-            _count = _content.Length;
+            Content = Encoding.ASCII.GetBytes(queryString);
+            Offset = 0;
+            Count = Content.Length;
 
-            _contentType = "application/x-www-form-urlencoded";
+            ContentTypeValue = "application/x-www-form-urlencoded";
         }
     }
 }

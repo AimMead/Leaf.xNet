@@ -8,28 +8,20 @@ namespace Leaf.Net
     public sealed class UploadProgressChangedEventArgs : EventArgs
     {
         #region Свойства (открытые)
-
         /// <summary>
         /// Возвращает количество отправленных байтов.
         /// </summary>
-        public long BytesSent { get; private set; }
+        public long BytesSent { get; }
 
         /// <summary>
         /// Возвращает общее количество отправляемых байтов.
         /// </summary>
-        public long TotalBytesToSend { get; private set; }
+        public long TotalBytesToSend { get; }
 
         /// <summary>
         /// Возвращает процент отправленных байтов.
         /// </summary>
-        public double ProgressPercentage
-        {
-            get
-            {
-                return ((double)BytesSent / (double)TotalBytesToSend) * 100.0;
-            }
-        }
-
+        public double ProgressPercentage => BytesSent / (double)TotalBytesToSend * 100.0;
         #endregion
 
 

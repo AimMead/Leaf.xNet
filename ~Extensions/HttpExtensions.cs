@@ -3,21 +3,18 @@ using System.Net;
 using System.Net.Http;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Leaf.Net
 {
     internal static class HttpExtensions
     {
-        readonly static Dictionary<string, string> headerSeparators = new Dictionary<string, string>(){
-                {"User-Agent", " "}
+        private static readonly Dictionary<string, string> HeaderSeparators = new Dictionary<string, string> {
+            { "User-Agent", " " }
         };
 
         public static HttpResponseMessage ToHttpResponseMessage(this HttpResponse httpResponse)
         {
             var code     = (System.Net.HttpStatusCode)((int)httpResponse.StatusCode);
-
             var response = new HttpResponseMessage(code); 
             var headers  = httpResponse.EnumerateHeaders();
 
@@ -38,24 +35,17 @@ namespace Leaf.Net
                 ? request.Content.Headers 
                 : Enumerable.Empty<KeyValuePair<string, IEnumerable<string>>>());
 
-            httpRequest.Cookies = new CookieStorage(false, cookieContainer);
-            /*
-            foreach (var cookie in cookieContainer.GetCookies(request.RequestUri).Cast<Cookie>())
-            {
-                httpRequest.Cookies.Add(cookie.Name, cookie);
-            }*/
-
+            // Append cookie headers depend on cookie storage
+            httpRequest.Cookies = new CookieStorage(false, cookieContainer);            
             foreach (var keyValue in headers)
-            {
-                httpRequest.AddHeader(keyValue.Key, String.Join(GetHeaderSeparator(keyValue.Key), keyValue.Value));
-            }
+                httpRequest.AddHeader(keyValue.Key, string.Join(GetHeaderSeparator(keyValue.Key), keyValue.Value));
 
             return httpRequest;
         }
 
         public static void FillCookieContainer(CookieContainer cookieContainer, HttpResponse httpResponse)
         {
-            //simplified, all cookies are set to the root path
+            // Simplified, all cookies are set to the root path
             var rootUri = new Uri($"{httpResponse.Address.Scheme}://{httpResponse.Address.Authority}");
             var cookies = httpResponse.Cookies.GetCookies(rootUri);
 
@@ -65,12 +55,7 @@ namespace Leaf.Net
 
         private static string GetHeaderSeparator(string name)
         {
-            if (headerSeparators.ContainsKey(name))
-            {
-                return headerSeparators[name];
-            }
-
-            return ",";
+            return HeaderSeparators.ContainsKey(name) ? HeaderSeparators[name] : ",";
         }
     }
 }

@@ -8,24 +8,16 @@ namespace Leaf.Net
     public abstract class HttpContent
     {
         /// <summary>MIME-тип контента.</summary>
-        protected string _contentType = string.Empty;
-
+        protected string ContentTypeValue = string.Empty;
 
         /// <summary>
         /// Возвращает или задаёт MIME-тип контента.
         /// </summary>
         public string ContentType
         {
-            get
-            {
-                return _contentType;
-            }
-            set
-            {
-                _contentType = value ?? string.Empty;
-            }
+            get => ContentTypeValue;
+            set => ContentTypeValue = value ?? string.Empty;
         }
-
 
         #region Методы (открытые)
 
@@ -50,7 +42,6 @@ namespace Leaf.Net
         }
 
         #endregion
-
 
         /// <summary>
         /// Освобождает неуправляемые (а при необходимости и управляемые) ресурсы, используемые объектом <see cref="HttpContent"/>.

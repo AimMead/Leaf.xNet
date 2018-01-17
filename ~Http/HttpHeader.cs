@@ -37,6 +37,7 @@ namespace Leaf.Net
         ContentLanguage,
         ContentLength,
         ContentLocation,
+        // ReSharper disable once InconsistentNaming
         ContentMD5,
         ContentDisposition,
         ContentRange,

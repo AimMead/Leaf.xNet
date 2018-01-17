@@ -24,70 +24,34 @@ namespace Leaf.Net
         {
             #region Поля (закрытые)
 
-            private Stream _baseStream;
-            private int _sendBufferSize;
+            private readonly Stream _baseStream;
+            private readonly int _sendBufferSize;
 
             #endregion
 
 
             #region Свойства (открытые)
 
-            public Action<int> BytesReadCallback { get; set; }
+            public Action<int> BytesReadCallback { private get; set; }
 
-            public Action<int> BytesWriteCallback { get; set; }
+            public Action<int> BytesWriteCallback { private get; set; }
 
             #region Переопределённые
 
-            public override bool CanRead
-            {
-                get
-                {
-                    return _baseStream.CanRead;
-                }
-            }
+            public override bool CanRead => _baseStream.CanRead;
 
-            public override bool CanSeek
-            {
-                get
-                {
-                    return _baseStream.CanSeek;
-                }
-            }
+            public override bool CanSeek => _baseStream.CanSeek;
 
-            public override bool CanTimeout
-            {
-                get
-                {
-                    return _baseStream.CanTimeout;
-                }
-            }
+            public override bool CanTimeout => _baseStream.CanTimeout;
 
-            public override bool CanWrite
-            {
-                get
-                {
-                    return _baseStream.CanWrite;
-                }
-            }
+            public override bool CanWrite => _baseStream.CanWrite;
 
-            public override long Length
-            {
-                get
-                {
-                    return _baseStream.Length;
-                }
-            }
+            public override long Length => _baseStream.Length;
 
             public override long Position
             {
-                get
-                {
-                    return _baseStream.Position;
-                }
-                set
-                {
-                    _baseStream.Position = value;
-                }
+                get => _baseStream.Position;
+                set => _baseStream.Position = value;
             }
 
             #endregion
@@ -119,11 +83,7 @@ namespace Leaf.Net
             public override int Read(byte[] buffer, int offset, int count)
             {
                 int bytesRead = _baseStream.Read(buffer, offset, count);
-
-                if (BytesReadCallback != null)
-                {
-                    BytesReadCallback(bytesRead);
-                }
+                BytesReadCallback?.Invoke(bytesRead);
 
                 return bytesRead;
             }
@@ -133,33 +93,31 @@ namespace Leaf.Net
                 if (BytesWriteCallback == null)
                 {
                     _baseStream.Write(buffer, offset, count);
+                    return;
                 }
-                else
+                
+                int index = 0;
+                while (count > 0)
                 {
-                    int index = 0;
+                    int bytesWrite;
 
-                    while (count > 0)
+                    if (count >= _sendBufferSize)
                     {
-                        int bytesWrite = 0;
+                        bytesWrite = _sendBufferSize;
+                        _baseStream.Write(buffer, index, bytesWrite);
 
-                        if (count >= _sendBufferSize)
-                        {
-                            bytesWrite = _sendBufferSize;
-                            _baseStream.Write(buffer, index, bytesWrite);
-
-                            index += _sendBufferSize;
-                            count -= _sendBufferSize;
-                        }
-                        else
-                        {
-                            bytesWrite = count;
-                            _baseStream.Write(buffer, index, bytesWrite);
-
-                            count = 0;
-                        }
-
-                        BytesWriteCallback(bytesWrite);
+                        index += _sendBufferSize;
+                        count -= _sendBufferSize;
                     }
+                    else
+                    {
+                        bytesWrite = count;
+                        _baseStream.Write(buffer, index, bytesWrite);
+
+                        count = 0;
+                    }
+
+                    BytesWriteCallback(bytesWrite);
                 }
             }
 
@@ -176,7 +134,7 @@ namespace Leaf.Net
         #region Статические поля (закрытые)
 
         // Заголовки, которые можно задать только с помощью специального свойства/метода.
-        private static readonly List<string> _closedHeaders = new List<string>()
+        private static readonly List<string> ClosedHeaders = new List<string>
         {
             //"Accept-Encoding",
             //"Content-Length",
@@ -207,8 +165,6 @@ namespace Leaf.Net
 
 
         #region Поля (закрытые)
-
-        private HttpResponse _response;
 
         private TcpClient _connection;
         private Stream _connectionCommonStream;
@@ -253,8 +209,9 @@ namespace Leaf.Net
         private long _totalBytesReceived;
         private bool _canReportBytesReceived;
 
-        private EventHandler<UploadProgressChangedEventArgs> _uploadProgressChangedHandler;
-        private EventHandler<DownloadProgressChangedEventArgs> _downloadProgressChangedHandler;
+        // TODO: event keyword is required?
+        private event EventHandler<UploadProgressChangedEventArgs> UploadProgressChangedHandler;
+        private event EventHandler<DownloadProgressChangedEventArgs> DownloadProgressChangedHandler;
 
 
         #endregion
@@ -267,14 +224,8 @@ namespace Leaf.Net
         /// </summary>
         public event EventHandler<UploadProgressChangedEventArgs> UploadProgressChanged
         {
-            add
-            {
-                _uploadProgressChangedHandler += value;
-            }
-            remove
-            {
-                _uploadProgressChangedHandler -= value;
-            }
+            add => UploadProgressChangedHandler += value;
+            remove => UploadProgressChangedHandler -= value;
         }
 
         /// <summary>
@@ -282,14 +233,8 @@ namespace Leaf.Net
         /// </summary>
         public event EventHandler<DownloadProgressChangedEventArgs> DownloadProgressChanged
         {
-            add
-            {
-                _downloadProgressChangedHandler += value;
-            }
-            remove
-            {
-                _downloadProgressChangedHandler -= value;
-            }
+            add => DownloadProgressChangedHandler += value;
+            remove => DownloadProgressChangedHandler -= value;
         }
 
         #endregion
@@ -311,13 +256,7 @@ namespace Leaf.Net
         /// <summary>
         /// Возвращает последний ответ от HTTP-сервера, полученный данным экземпляром класса.
         /// </summary>
-        public HttpResponse Response
-        {
-            get
-            {
-                return _response;
-            }
-        }
+        public HttpResponse Response { get; private set; }
 
         /// <summary>
         /// Возвращает или задает прокси-клиент.
@@ -346,19 +285,12 @@ namespace Leaf.Net
         /// <exception cref="System.ArgumentOutOfRangeException">Значение параметра меньше 1.</exception>
         public int MaximumAutomaticRedirections
         {
-            get
-            {
-                return _maximumAutomaticRedirections;
-            }
+            get => _maximumAutomaticRedirections;
             set
             {
                 #region Проверка параметра
-
                 if (value < 1)
-                {
-                    throw ExceptionHelper.CanNotBeLess("MaximumAutomaticRedirections", 1);
-                }
-
+                    throw ExceptionHelper.CanNotBeLess(nameof(MaximumAutomaticRedirections), 1);
                 #endregion
 
                 _maximumAutomaticRedirections = value;
@@ -372,19 +304,12 @@ namespace Leaf.Net
         /// <exception cref="System.ArgumentOutOfRangeException">Значение параметра меньше 0.</exception>
         public int ConnectTimeout
         {
-            get
-            {
-                return _connectTimeout;
-            }
+            get => _connectTimeout;
             set
             {
                 #region Проверка параметра
-
                 if (value < 0)
-                {
-                    throw ExceptionHelper.CanNotBeLess("ConnectTimeout", 0);
-                }
-
+                    throw ExceptionHelper.CanNotBeLess(nameof(ConnectTimeout), 0);
                 #endregion
 
                 _connectTimeout = value;
@@ -398,19 +323,12 @@ namespace Leaf.Net
         /// <exception cref="System.ArgumentOutOfRangeException">Значение параметра меньше 0.</exception>
         public int ReadWriteTimeout
         {
-            get
-            {
-                return _readWriteTimeout;
-            }
+            get => _readWriteTimeout;
             set
             {
                 #region Проверка параметра
-
                 if (value < 0)
-                {
-                    throw ExceptionHelper.CanNotBeLess("ReadWriteTimeout", 0);
-                }
-
+                    throw ExceptionHelper.CanNotBeLess(nameof(ReadWriteTimeout), 0);
                 #endregion
 
                 _readWriteTimeout = value;
@@ -439,19 +357,12 @@ namespace Leaf.Net
         /// <remarks>Если время вышло, то будет создано новое подключение. Если сервер вернёт своё значение таймаута <see cref="HttpResponse.KeepAliveTimeout"/>, тогда будет использовано именно оно.</remarks>
         public int KeepAliveTimeout
         {
-            get
-            {
-                return _keepAliveTimeout;
-            }
+            get => _keepAliveTimeout;
             set
             {
                 #region Проверка параметра
-
                 if (value < 0)
-                {
-                    throw ExceptionHelper.CanNotBeLess("KeepAliveTimeout", 0);
-                }
-
+                    throw ExceptionHelper.CanNotBeLess(nameof(KeepAliveTimeout), 0);
                 #endregion
 
                 _keepAliveTimeout = value;
@@ -466,18 +377,12 @@ namespace Leaf.Net
         /// <remarks>Если количество запросов превысило максимальное, то будет создано новое подключение. Если сервер вернёт своё значение максимального кол-ва запросов <see cref="HttpResponse.MaximumKeepAliveRequests"/>, тогда будет использовано именно оно.</remarks>
         public int MaximumKeepAliveRequests
         {
-            get
-            {
-                return _maximumKeepAliveRequests;
-            }
+            get => _maximumKeepAliveRequests;
             set
             {
                 #region Проверка параметра
-
                 if (value < 1)
-                {
-                    throw ExceptionHelper.CanNotBeLess("MaximumKeepAliveRequests", 1);
-                }
+                    throw ExceptionHelper.CanNotBeLess(nameof(MaximumKeepAliveRequests), 1);
 
                 #endregion
 
@@ -498,19 +403,12 @@ namespace Leaf.Net
         /// <exception cref="System.ArgumentOutOfRangeException">Значение параметра меньше 1.</exception>
         public int ReconnectLimit
         {
-            get
-            {
-                return _reconnectLimit;
-            }
+            get => _reconnectLimit;
             set
             {
                 #region Проверка параметра
-
                 if (value < 1)
-                {
-                    throw ExceptionHelper.CanNotBeLess("ReconnectLimit", 1);
-                }
-
+                    throw ExceptionHelper.CanNotBeLess(nameof(ReconnectLimit), 1);
                 #endregion
 
                 _reconnectLimit = value;
@@ -524,19 +422,12 @@ namespace Leaf.Net
         /// <exception cref="System.ArgumentOutOfRangeException">Значение параметра меньше 0.</exception>
         public int ReconnectDelay
         {
-            get
-            {
-                return _reconnectDelay;
-            }
+            get => _reconnectDelay;
             set
             {
                 #region Проверка параметра
-
                 if (value < 0)
-                {
-                    throw ExceptionHelper.CanNotBeLess("ReconnectDelay", 0);
-                }
-
+                    throw ExceptionHelper.CanNotBeLess(nameof(ReconnectDelay), 0);
                 #endregion
 
                 _reconnectDelay = value;
@@ -588,14 +479,8 @@ namespace Leaf.Net
         /// <value>Значение по умолчанию — <see langword="null"/>.</value>
         public string UserAgent
         {
-            get
-            {
-                return this["User-Agent"];
-            }
-            set
-            {
-                this["User-Agent"] = value;
-            }
+            get => this["User-Agent"];
+            set => this["User-Agent"] = value;
         }
 
         /// <summary>
@@ -604,14 +489,8 @@ namespace Leaf.Net
         /// <value>Значение по умолчанию — <see langword="null"/>.</value>
         public string Referer
         {
-            get
-            {
-                return this["Referer"];
-            }
-            set
-            {
-                this["Referer"] = value;
-            }
+            get => this["Referer"];
+            set => this["Referer"] = value;
         }
 
         /// <summary>
@@ -620,14 +499,8 @@ namespace Leaf.Net
         /// <value>Значение по умолчанию — <see langword="null"/>.</value>
         public string Authorization
         {
-            get
-            {
-                return this["Authorization"];
-            }
-            set
-            {
-                this["Authorization"] = value;
-            }
+            get => this["Authorization"];
+            set => this["Authorization"] = value;
         }
 
         /// <summary>
@@ -644,45 +517,16 @@ namespace Leaf.Net
 
         #region Свойства (внутренние)
 
-        internal TcpClient TcpClient
-        {
-            get
-            {
-                return _connection;
-            }
-        }
+        internal TcpClient TcpClient => _connection;
 
-        internal Stream ClientStream
-        {
-            get
-            {
-                return _connectionCommonStream;
-            }
-        }
+        internal Stream ClientStream => _connectionCommonStream;
 
-        internal NetworkStream ClientNetworkStream
-        {
-            get
-            {
-                return _connectionNetworkStream;
-            }
-        }
+        internal NetworkStream ClientNetworkStream => _connectionNetworkStream;
 
         #endregion
 
 
-        private MultipartContent AddedMultipartData
-        {
-            get
-            {
-                if (_temporaryMultipartContent == null)
-                {
-                    _temporaryMultipartContent = new MultipartContent();
-                }
-
-                return _temporaryMultipartContent;
-            }
-        }
+        private MultipartContent AddedMultipartData => _temporaryMultipartContent ?? (_temporaryMultipartContent = new MultipartContent());
 
 
         #region Индексаторы (открытые)
@@ -727,23 +571,16 @@ namespace Leaf.Net
                 #region Проверка параметра
 
                 if (headerName == null)
-                {
-                    throw new ArgumentNullException("headerName");
-                }
+                    throw new ArgumentNullException(nameof(headerName));
 
                 if (headerName.Length == 0)
-                {
-                    throw ExceptionHelper.EmptyString("headerName");
-                }
+                    throw ExceptionHelper.EmptyString(nameof(headerName));
 
                 #endregion
 
                 string value;
-
                 if (!_permanentHeaders.TryGetValue(headerName, out value))
-                {
                     value = string.Empty;
-                }
 
                 return value;
             }
@@ -752,31 +589,21 @@ namespace Leaf.Net
                 #region Проверка параметра
 
                 if (headerName == null)
-                {
-                    throw new ArgumentNullException("headerName");
-                }
+                    throw new ArgumentNullException(nameof(headerName));
 
                 if (headerName.Length == 0)
-                {
                     throw ExceptionHelper.EmptyString("headerName");
-                }
 
                 if (IsClosedHeader(headerName))
-                {
                     throw new ArgumentException(string.Format(
-                        Resources.ArgumentException_HttpRequest_SetNotAvailableHeader, headerName), "headerName");
-                }
+                        Resources.ArgumentException_HttpRequest_SetNotAvailableHeader, headerName), nameof(headerName));
 
                 #endregion
 
                 if (string.IsNullOrEmpty(value))
-                {
                     _permanentHeaders.Remove(headerName);
-                }
                 else
-                {
                     _permanentHeaders[headerName] = value;
-                }
             }
         }
 
@@ -810,14 +637,8 @@ namespace Leaf.Net
         /// </remarks>
         public string this[HttpHeader header]
         {
-            get
-            {
-                return this[Http.Headers[header]];
-            }
-            set
-            {
-                this[Http.Headers[header]] = value;
-            }
+            get => this[Http.Headers[header]];
+            set => this[Http.Headers[header]] = value;
         }
 
         #endregion
@@ -849,28 +670,20 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (baseAddress == null)
-            {
-                throw new ArgumentNullException("baseAddress");
-            }
+                throw new ArgumentNullException(nameof(baseAddress));
 
             if (baseAddress.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("baseAddress");
-            }
+                throw ExceptionHelper.EmptyString(nameof(baseAddress));
 
             #endregion
 
             if (!baseAddress.StartsWith("http"))
-            {
                 baseAddress = "http://" + baseAddress;
-            }
 
             var uri = new Uri(baseAddress);
 
             if (!uri.IsAbsoluteUri)
-            {
-                throw new ArgumentException(Resources.ArgumentException_OnlyAbsoluteUri, "baseAddress");
-            }
+                throw new ArgumentException(Resources.ArgumentException_OnlyAbsoluteUri, nameof(baseAddress));
 
             BaseAddress = uri;
 
@@ -888,14 +701,10 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (baseAddress == null)
-            {
-                throw new ArgumentNullException("baseAddress");
-            }
+                throw new ArgumentNullException(nameof(baseAddress));
 
             if (!baseAddress.IsAbsoluteUri)
-            {
-                throw new ArgumentException(Resources.ArgumentException_OnlyAbsoluteUri, "baseAddress");
-            }
+                throw new ArgumentException(Resources.ArgumentException_OnlyAbsoluteUri, nameof(baseAddress));
 
             #endregion
 
@@ -923,9 +732,7 @@ namespace Leaf.Net
         public HttpResponse Get(string address, RequestParams urlParams = null)
         {
             if (urlParams != null)
-            {
                 _temporaryUrlParams = urlParams;
-            }
 
             return Raw(HttpMethod.GET, address);
         }
@@ -941,9 +748,7 @@ namespace Leaf.Net
         public HttpResponse Get(Uri address, RequestParams urlParams = null)
         {
             if (urlParams != null)
-            {
                 _temporaryUrlParams = urlParams;
-            }
 
             return Raw(HttpMethod.GET, address);
         }
@@ -958,9 +763,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> GetAsync(string address, RequestParams urlParams = null)
         {
-            return await Task.Run(() => {
-                return this.Get(address, urlParams);
-            });
+            return await Task.Run(() => Get(address, urlParams));
         }
 		
 		/// <summary>
@@ -973,10 +776,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> GetAsync(Uri address, RequestParams urlParams = null)
         {
-            return await Task.Run<HttpResponse>(() =>
-            {
-                return this.Get(address, urlParams);
-            });
+            return await Task.Run(() => Get(address, urlParams));
         }
         #endregion
 
@@ -1005,9 +805,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(string address)
         {
-           return await Task.Run(() => {
-               return this.Post(address);
-           });
+           return await Task.Run(() => Post(address));
         }
 
         /// <summary>
@@ -1031,9 +829,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(Uri address)
         {
-            return await Task.Run(() => {
-                return this.Post(address);
-            });
+            return await Task.Run(() => Post(address));
         }
 
         /// <summary>
@@ -1055,9 +851,7 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (reqParams == null)
-            {
-                throw new ArgumentNullException("reqParams");
-            }
+                throw new ArgumentNullException(nameof(reqParams));
 
             #endregion
 
@@ -1081,9 +875,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(string address, RequestParams reqParams, bool dontEscape = false)
         {
-            return await Task.Run(() => {
-                return this.Post(address, reqParams, dontEscape);
-            });
+            return await Task.Run(() => Post(address, reqParams, dontEscape));
         }
 
         /// <summary>
@@ -1102,12 +894,8 @@ namespace Leaf.Net
         public HttpResponse Post(Uri address, RequestParams reqParams, bool dontEscape = false)
         {
             #region Проверка параметров
-
             if (reqParams == null)
-            {
-                throw new ArgumentNullException("reqParams");
-            }
-
+                throw new ArgumentNullException(nameof(reqParams));
             #endregion
 
             return Raw(HttpMethod.POST, address, new FormUrlEncodedContent(reqParams, dontEscape, CharacterSet));
@@ -1128,9 +916,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(Uri address, RequestParams reqParams, bool dontEscape = false)
         {
-            return await Task.Run(() => {
-                return this.Post(address, reqParams, dontEscape);
-            });
+            return await Task.Run(() => Post(address, reqParams, dontEscape));
         }
 
         /// <summary>
@@ -1160,29 +946,20 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (str == null)
-            {
-                throw new ArgumentNullException("str");
-            }
+                throw new ArgumentNullException(nameof(str));
 
             if (str.Length == 0)
-            {
-                throw new ArgumentNullException("str");
-            }
+                throw new ArgumentNullException(nameof(str));
 
             if (contentType == null)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             if (contentType.Length == 0)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             #endregion
 
-            var content = new StringContent(str)
-            {
+            var content = new StringContent(str) {
                 ContentType = contentType
             };
 
@@ -1213,9 +990,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(string address, string str, string contentType)
         {
-            return await Task.Run(() => {
-                return this.Post(address, str, contentType);
-            });
+            return await Task.Run(() => Post(address, str, contentType));
         }
 
         /// <summary>
@@ -1243,29 +1018,20 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (str == null)
-            {
-                throw new ArgumentNullException("str");
-            }
+                throw new ArgumentNullException(nameof(str));
 
             if (str.Length == 0)
-            {
-                throw new ArgumentNullException("str");
-            }
+                throw new ArgumentNullException(nameof(str));
 
             if (contentType == null)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             if (contentType.Length == 0)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             #endregion
 
-            var content = new StringContent(str)
-            {
+            var content = new StringContent(str) {
                 ContentType = contentType
             };
 
@@ -1294,9 +1060,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(Uri address, string str, string contentType)
         {
-            return await Task.Run(() => {
-                return this.Post(address, str, contentType);
-            });
+            return await Task.Run(() => Post(address, str, contentType));
         }
 
         /// <summary>
@@ -1324,24 +1088,17 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (bytes == null)
-            {
-                throw new ArgumentNullException("bytes");
-            }
+                throw new ArgumentNullException(nameof(bytes));
 
             if (contentType == null)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             if (contentType.Length == 0)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             #endregion
 
-            var content = new BytesContent(bytes)
-            {
+            var content = new BytesContent(bytes) {
                 ContentType = contentType
             };
 
@@ -1370,9 +1127,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(string address, byte[] bytes, string contentType = "application/octet-stream")
         {
-            return await Task.Run(() => {
-                return this.Post(address, bytes, contentType);
-            });
+            return await Task.Run(() => Post(address, bytes, contentType));
         }
 
         /// <summary>
@@ -1396,24 +1151,17 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (bytes == null)
-            {
-                throw new ArgumentNullException("bytes");
-            }
+                throw new ArgumentNullException(nameof(bytes));
 
             if (contentType == null)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             if (contentType.Length == 0)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             #endregion
 
-            var content = new BytesContent(bytes)
-            {
+            var content = new BytesContent(bytes) {
                 ContentType = contentType
             };
 
@@ -1439,10 +1187,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(Uri address, byte[] bytes, string contentType = "application/octet-stream")
         {
-            return await Task.Run(() =>
-            {
-                return this.Post(address, bytes, contentType);
-            });
+            return await Task.Run(() => Post(address, bytes, contentType));
         }
 
         /// <summary>
@@ -1470,24 +1215,17 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (stream == null)
-            {
-                throw new ArgumentNullException("stream");
-            }
+                throw new ArgumentNullException(nameof(stream));
 
             if (contentType == null)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             if (contentType.Length == 0)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             #endregion
 
-            var content = new StreamContent(stream)
-            {
+            var content = new StreamContent(stream) {
                 ContentType = contentType
             };
 
@@ -1516,9 +1254,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(string address, Stream stream, string contentType = "application/octet-stream")
         {
-            return await Task.Run(() => {
-                return this.Post(address, stream, contentType);
-            });
+            return await Task.Run(() => Post(address, stream, contentType));
         }
 
         /// <summary>
@@ -1542,24 +1278,17 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (stream == null)
-            {
-                throw new ArgumentNullException("stream");
-            }
+                throw new ArgumentNullException(nameof(stream));
 
             if (contentType == null)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             if (contentType.Length == 0)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             #endregion
 
-            var content = new StreamContent(stream)
-            {
+            var content = new StreamContent(stream) {
                 ContentType = contentType
             };
 
@@ -1584,9 +1313,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(Uri address, Stream stream, string contentType = "application/octet-stream")
         {
-            return await Task.Run(() => {
-                return this.Post(address, stream, contentType);
-            });
+            return await Task.Run(() => Post(address, stream, contentType));
         }
 
         /// <summary>
@@ -1609,17 +1336,8 @@ namespace Leaf.Net
         public HttpResponse Post(string address, string path)
         {
             #region Проверка параметров
-
-            if (path == null)
-            {
-                throw new ArgumentNullException("path");
-            }
-
-            if (path.Length == 0)
-            {
-                throw new ArgumentNullException("path");
-            }
-
+            if (string.IsNullOrEmpty(path))
+                throw new ArgumentNullException(nameof(path));            
             #endregion
 
             return Raw(HttpMethod.POST, address, new FileContent(path));
@@ -1644,9 +1362,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(string address, string path)
         {
-            return await Task.Run(() => {
-                return this.Post(address, path);
-            });
+            return await Task.Run(() => Post(address, path));
         }
 
         /// <summary>
@@ -1667,14 +1383,10 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (path == null)
-            {
-                throw new ArgumentNullException("path");
-            }
+                throw new ArgumentNullException(nameof(path));
 
             if (path.Length == 0)
-            {
-                throw new ArgumentNullException("path");
-            }
+                throw new ArgumentNullException(nameof(path));
 
             #endregion
 
@@ -1696,9 +1408,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(Uri address, string path)
         {
-            return await Task.Run(() => {
-                return this.Post(address, path);
-            });
+            return await Task.Run(() => Post(address, path));
         }
 
         /// <summary>
@@ -1719,9 +1429,7 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (content == null)
-            {
-                throw new ArgumentNullException("content");
-            }
+                throw new ArgumentNullException(nameof(content));
 
             #endregion
 
@@ -1743,9 +1451,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(string address, HttpContent content)
         {
-            return await Task.Run(() => {
-                return this.Post(address, content);
-            });
+            return await Task.Run(() => Post(address, content));
         }
 
         /// <summary>
@@ -1763,12 +1469,8 @@ namespace Leaf.Net
         public HttpResponse Post(Uri address, HttpContent content)
         {
             #region Проверка параметров
-
             if (content == null)
-            {
-                throw new ArgumentNullException("content");
-            }
-
+                throw new ArgumentNullException(nameof(content));
             #endregion
 
             return Raw(HttpMethod.POST, address, content);
@@ -1789,9 +1491,7 @@ namespace Leaf.Net
         /// <exception cref="Leaf.Net.HttpException">Ошибка при работе с HTTP-протоколом.</exception>
         public async Task<HttpResponse> PostAsync(Uri address, HttpContent content)
         {        
-            return await Task.Run(() => {
-                return this.Post(address, content);
-            }); 
+            return await Task.Run(() => Post(address, content)); 
         }
 
         #endregion
@@ -1813,14 +1513,10 @@ namespace Leaf.Net
             #region Проверка параметров
 
             if (address == null)
-            {
-                throw new ArgumentNullException("address");
-            }
+                throw new ArgumentNullException(nameof(address));
 
             if (address.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("address");
-            }
+                throw ExceptionHelper.EmptyString(nameof(address));
 
             #endregion
 
@@ -1828,10 +1524,8 @@ namespace Leaf.Net
             return Raw(method, uri, content);
         }
 
-        public Task<HttpResponse> RawAsync(HttpMethod method, string address, HttpContent content = null)
-        {
-            return Task.Run<HttpResponse>(() => { return Raw(method, address); });
-        }
+        public Task<HttpResponse> RawAsync(HttpMethod method, string address, HttpContent content = null) 
+            => Task.Run(() => Raw(method, address));
 
         /// <summary>
         /// Отправляет запрос HTTP-серверу.
@@ -1845,12 +1539,8 @@ namespace Leaf.Net
         public HttpResponse Raw(HttpMethod method, Uri address, HttpContent content = null)
         {
             #region Проверка параметров
-
             if (address == null)
-            {
-                throw new ArgumentNullException("address");
-            }
-
+                throw new ArgumentNullException(nameof(address));
             #endregion
 
             if (!address.IsAbsoluteUri)
@@ -1858,8 +1548,10 @@ namespace Leaf.Net
 
             if (_temporaryUrlParams != null)
             {
-                var uriBuilder = new UriBuilder(address);
-                uriBuilder.Query = Http.ToQueryString(_temporaryUrlParams, true);
+                var uriBuilder = new UriBuilder(address)
+                {
+                    Query = Http.ToQueryString(_temporaryUrlParams, true)
+                };
 
                 address = uriBuilder.Uri;
             }
@@ -1867,13 +1559,9 @@ namespace Leaf.Net
             if (content == null)
             {
                 if (_temporaryParams != null)
-                {
                     content = new FormUrlEncodedContent(_temporaryParams, false, CharacterSet);
-                }
                 else if (_temporaryMultipartContent != null)
-                {
                     content = _temporaryMultipartContent;
-                }
             }
 
             try
@@ -1882,8 +1570,7 @@ namespace Leaf.Net
             }
             finally
             {
-                if (content != null)
-                    content.Dispose();
+                content?.Dispose();
 
                 ClearRequestData();
             }
@@ -1904,23 +1591,12 @@ namespace Leaf.Net
         public HttpRequest AddUrlParam(string name, object value = null)
         {
             #region Проверка параметров
-
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            if (name.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("name");
-            }
-
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentNullException(nameof(name));
             #endregion
 
             if (_temporaryUrlParams == null)
-            {
                 _temporaryUrlParams = new RequestParams();
-            }
 
             _temporaryUrlParams[name] = value;
 
@@ -1938,23 +1614,12 @@ namespace Leaf.Net
         public HttpRequest AddParam(string name, object value = null)
         {
             #region Проверка параметров
-
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            if (name.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("name");
-            }
-
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentNullException(nameof(name));
             #endregion
 
             if (_temporaryParams == null)
-            {
                 _temporaryParams = new RequestParams();
-            }
 
             _temporaryParams[name] = value;
 
@@ -1991,24 +1656,15 @@ namespace Leaf.Net
         {
             #region Проверка параметров
 
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            if (name.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("name");
-            }
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentNullException(nameof(name));
 
             if (encoding == null)
-            {
-                throw new ArgumentNullException("encoding");
-            }
+                throw new ArgumentNullException(nameof(encoding));
 
             #endregion
 
-            string contentValue = (value == null ? string.Empty : value.ToString());
+            string contentValue = value?.ToString() ?? string.Empty;
 
             AddedMultipartData.Add(new StringContent(contentValue, encoding), name);
 
@@ -2031,20 +1687,11 @@ namespace Leaf.Net
         {
             #region Проверка параметров
 
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            if (name.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("name");
-            }
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentNullException(nameof(name));
 
             if (value == null)
-            {
-                throw new ArgumentNullException("value");
-            }
+                throw new ArgumentNullException(nameof(value));
 
             #endregion
 
@@ -2071,27 +1718,14 @@ namespace Leaf.Net
         public HttpRequest AddFile(string name, string fileName, byte[] value)
         {
             #region Проверка параметров
-
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            if (name.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("name");
-            }
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentNullException(nameof(name));
 
             if (fileName == null)
-            {
-                throw new ArgumentNullException("fileName");
-            }
+                throw new ArgumentNullException(nameof(fileName));
 
             if (value == null)
-            {
-                throw new ArgumentNullException("value");
-            }
-
+                throw new ArgumentNullException(nameof(value));
             #endregion
 
             AddedMultipartData.Add(new BytesContent(value), name, fileName);
@@ -2121,30 +1755,17 @@ namespace Leaf.Net
         {
             #region Проверка параметров
 
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            if (name.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("name");
-            }
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentNullException(nameof(name));
 
             if (fileName == null)
-            {
-                throw new ArgumentNullException("fileName");
-            }
+                throw new ArgumentNullException(nameof(fileName));
 
             if (contentType == null)
-            {
-                throw new ArgumentNullException("contentType");
-            }
+                throw new ArgumentNullException(nameof(contentType));
 
             if (value == null)
-            {
-                throw new ArgumentNullException("value");
-            }
+                throw new ArgumentNullException(nameof(value));
 
             #endregion
 
@@ -2171,27 +1792,14 @@ namespace Leaf.Net
         public HttpRequest AddFile(string name, string fileName, Stream stream)
         {
             #region Проверка параметров
-
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            if (name.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("name");
-            }
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentNullException(nameof(name));
 
             if (fileName == null)
-            {
-                throw new ArgumentNullException("fileName");
-            }
+                throw new ArgumentNullException(nameof(fileName));
 
             if (stream == null)
-            {
-                throw new ArgumentNullException("stream");
-            }
-
+                throw new ArgumentNullException(nameof(stream));
             #endregion
 
             AddedMultipartData.Add(new StreamContent(stream), name, fileName);
@@ -2221,32 +1829,14 @@ namespace Leaf.Net
         public HttpRequest AddFile(string name, string fileName, string path)
         {
             #region Проверка параметров
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentNullException(nameof(name));
+           
+            if (string.IsNullOrEmpty(fileName))
+                throw new ArgumentNullException(nameof(fileName));
 
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            if (name.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("name");
-            }
-
-            if (fileName == null)
-            {
-                throw new ArgumentNullException("fileName");
-            }
-
-            if (path == null)
-            {
-                throw new ArgumentNullException("path");
-            }
-
-            if (path.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("path");
-            }
-
+            if (string.IsNullOrEmpty(path))
+                throw new ArgumentNullException(nameof(path));
             #endregion
 
             AddedMultipartData.Add(new FileContent(path), name, fileName);
@@ -2273,31 +1863,14 @@ namespace Leaf.Net
         public HttpRequest AddFile(string name, string path)
         {
             #region Проверка параметров
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentNullException(nameof(name));
 
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            if (name.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("name");
-            }
-
-            if (path == null)
-            {
-                throw new ArgumentNullException("path");
-            }
-
-            if (path.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("path");
-            }
-
+            if (string.IsNullOrEmpty(path))
+                throw new ArgumentNullException(nameof(path));
             #endregion
 
-            AddedMultipartData.Add(new FileContent(path),
-                name, Path.GetFileName(path));
+            AddedMultipartData.Add(new FileContent(path), name, Path.GetFileName(path));
 
             return this;
         }
@@ -2323,39 +1896,19 @@ namespace Leaf.Net
         public HttpRequest AddHeader(string name, string value)
         {
             #region Проверка параметров
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentNullException(nameof(name));
 
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            if (name.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("name");
-            }
-
-            if (value == null)
-            {
-                throw new ArgumentNullException("value");
-            }
-
-            if (value.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("value");
-            }
+            if (string.IsNullOrEmpty(value))
+                throw new ArgumentNullException(nameof(value));
 
             if (IsClosedHeader(name))
-            {
-                throw new ArgumentException(string.Format(
-                    Resources.ArgumentException_HttpRequest_SetNotAvailableHeader, name), "name");
-            }
+                throw new ArgumentException(string.Format(Resources.ArgumentException_HttpRequest_SetNotAvailableHeader, name), nameof(name));
 
             #endregion
 
             if (_temporaryHeaders == null)
-            {
                 _temporaryHeaders = new Dictionary<string, string>();
-            }
 
             _temporaryHeaders[name] = value;
 
@@ -2387,31 +1940,20 @@ namespace Leaf.Net
         /// Закрывает соединение с HTTP-сервером.
         /// </summary>
         /// <remarks>Вызов данного метода равносилен вызову метода <see cref="Dispose"/>.</remarks>
-        public void Close()
-        {
-            Dispose();
-        }
+        public void Close() => Dispose();
 
         /// <summary>
         /// Освобождает все ресурсы, используемые текущим экземпляром класса <see cref="HttpRequest"/>.
         /// </summary>
-        public void Dispose()
-        {
-            Dispose(true);
-        }
+        public void Dispose() => Dispose(true);
 
         /// <summary>
         /// Определяет, содержатся ли указанные куки.
         /// </summary>
         /// <param name="name">Название куки.</param>
         /// <returns>Значение <see langword="true"/>, если указанные куки содержатся, иначе значение <see langword="false"/>.</returns>
-        public bool ContainsCookie(string url, string name)
-        {
-            if (Cookies == null)
-                return false;
-
-            return Cookies.ContainsKey(url, name);
-        }
+        public bool ContainsCookie(string url, string name) 
+            => Cookies != null && Cookies.ContainsKey(url, name);
 
         #region Работа с заголовками
 
@@ -2425,17 +1967,8 @@ namespace Leaf.Net
         public bool ContainsHeader(string headerName)
         {
             #region Проверка параметров
-
-            if (headerName == null)
-            {
-                throw new ArgumentNullException("headerName");
-            }
-
-            if (headerName.Length == 0)
-            {
-                throw ExceptionHelper.EmptyString("headerName");
-            }
-
+            if (string.IsNullOrEmpty(headerName))
+                throw new ArgumentNullException(nameof(headerName));
             #endregion
 
             return _permanentHeaders.ContainsKey(headerName);
@@ -2447,26 +1980,19 @@ namespace Leaf.Net
         /// <param name="header">HTTP-заголовок.</param>
         /// <returns>Значение <see langword="true"/>, если указанный HTTP-заголовок содержится, иначе значение <see langword="false"/>.</returns>
         public bool ContainsHeader(HttpHeader header)
-        {
-            return ContainsHeader(Http.Headers[header]);
-        }
+            => ContainsHeader(Http.Headers[header]);
 
         /// <summary>
         /// Возвращает перечисляемую коллекцию HTTP-заголовков.
         /// </summary>
         /// <returns>Коллекция HTTP-заголовков.</returns>
-        public Dictionary<string, string>.Enumerator EnumerateHeaders()
-        {
-            return _permanentHeaders.GetEnumerator();
-        }
+        public Dictionary<string, string>.Enumerator EnumerateHeaders() 
+            => _permanentHeaders.GetEnumerator();
 
         /// <summary>
         /// Очищает все HTTP-заголовки.
         /// </summary>
-        public void ClearAllHeaders()
-        {
-            _permanentHeaders.Clear();
-        }
+        public void ClearAllHeaders() => _permanentHeaders.Clear();
 
         #endregion
 
@@ -2480,15 +2006,15 @@ namespace Leaf.Net
         /// <param name="disposing">Значение <see langword="true"/> позволяет освободить управляемые и неуправляемые ресурсы; значение <see langword="false"/> позволяет освободить только неуправляемые ресурсы.</param>
         protected virtual void Dispose(bool disposing)
         {
-            if (disposing && _connection != null)
-            {
-                _connection.Close();
-                _connection = null;
-                _connectionCommonStream = null;
-                _connectionNetworkStream = null;
+            if (!disposing || _connection == null)
+                return;
 
-                _keepAliveRequestCount = 0;
-            }
+            _connection.Close();
+            _connection = null;
+            _connectionCommonStream = null;
+            _connectionNetworkStream = null;
+
+            _keepAliveRequestCount = 0;
         }
 
         /// <summary>
@@ -2497,12 +2023,8 @@ namespace Leaf.Net
         /// <param name="e">Аргументы события.</param>
         protected virtual void OnUploadProgressChanged(UploadProgressChangedEventArgs e)
         {
-            EventHandler<UploadProgressChangedEventArgs> eventHandler = _uploadProgressChangedHandler;
-
-            if (eventHandler != null)
-            {
-                eventHandler(this, e);
-            }
+            var eventHandler = UploadProgressChangedHandler;
+            eventHandler?.Invoke(this, e);
         }
 
         /// <summary>
@@ -2511,41 +2033,33 @@ namespace Leaf.Net
         /// <param name="e">Аргументы события.</param>
         protected virtual void OnDownloadProgressChanged(DownloadProgressChangedEventArgs e)
         {
-            EventHandler<DownloadProgressChangedEventArgs> eventHandler = _downloadProgressChangedHandler;
-
-            if (eventHandler != null)
-            {
-                eventHandler(this, e);
-            }
+            var eventHandler = DownloadProgressChangedHandler;
+            eventHandler?.Invoke(this, e);
         }
 
         #endregion
 
 
         #region Методы (закрытые)
-
         private void Init()
         {
             KeepAlive = true;
             AllowAutoRedirect = true;
             EnableEncodingContent = true;
 
-            _response = new HttpResponse(this);
+            Response = new HttpResponse(this);
         }
 
-        private Uri GetRequestAddress(Uri baseAddress, Uri address)
-        {
-            var requestAddress = address;
-
+        private static Uri GetRequestAddress(Uri baseAddress, Uri address)
+        {           
             if (baseAddress == null)
             {
                 var uriBuilder = new UriBuilder(address.OriginalString);
-                requestAddress = uriBuilder.Uri;
+                return uriBuilder.Uri;
             }
-            else
-            {
-                Uri.TryCreate(baseAddress, address, out requestAddress);
-            }
+
+            Uri requestAddress;
+            Uri.TryCreate(baseAddress, address, out requestAddress);
 
             return requestAddress;
         }
@@ -2554,144 +2068,143 @@ namespace Leaf.Net
 
         private HttpResponse Request(HttpMethod method, Uri address, HttpContent content)
         {
-            _method = method;
-            _content = content;
-
-            CloseConnectionIfNeeded();
-
-            var previousAddress = Address;
-            Address = address;
-
-            var createdNewConnection = false;
-            try
+            while (true)
             {
-                createdNewConnection = TryCreateConnectionOrUseExisting(address, previousAddress);
+                _method = method;
+                _content = content;
+
+                CloseConnectionIfNeeded();
+
+                var previousAddress = Address;
+                Address = address;
+
+                bool createdNewConnection;
+                try
+                {
+                    createdNewConnection = TryCreateConnectionOrUseExisting(address, previousAddress);
+                }
+                catch (HttpException ex)
+                {
+                    if (CanReconnect())
+                        return ReconnectAfterFail();
+
+                    throw;
+                }
+
+                if (createdNewConnection)
+                    _keepAliveRequestCount = 1;
+                else
+                    _keepAliveRequestCount++;
+
+                #region Отправка запроса
+
+                try
+                {
+                    SendRequestData(address, method);
+                }
+                catch (SecurityException ex)
+                {
+                    throw NewHttpException(Resources.HttpException_FailedSendRequest, ex, HttpExceptionStatus.SendFailure);
+                }
+                catch (IOException ex)
+                {
+                    if (CanReconnect())
+                        return ReconnectAfterFail();
+
+                    throw NewHttpException(Resources.HttpException_FailedSendRequest, ex, HttpExceptionStatus.SendFailure);
+                }
+
+                #endregion
+
+                #region Загрузка заголовков ответа
+
+                try
+                {
+                    ReceiveResponseHeaders(method);
+                }
+                catch (HttpException ex)
+                {
+                    if (CanReconnect())
+                        return ReconnectAfterFail();
+
+                    // Если сервер оборвал постоянное соединение вернув пустой ответ, то пробуем подключиться заново.
+                    // Он мог оборвать соединение потому, что достигнуто максимально допустимое кол-во запросов или вышло время простоя.
+                    if (KeepAlive && !_keepAliveReconnected && !createdNewConnection && ex.EmptyMessageBody)
+                        return KeepAliveReconect();
+
+                    throw;
+                }
+
+                #endregion
+
+                Response.ReconnectCount = _reconnectCount;
+
+                _reconnectCount = 0;
+                _keepAliveReconnected = false;
+                _whenConnectionIdle = DateTime.Now;
+
+                if (!IgnoreProtocolErrors)
+                    CheckStatusCode(Response.StatusCode);
+
+                #region Переадресация
+
+                if (AllowAutoRedirect && Response.HasRedirect)
+                {
+                    if (++_redirectionCount > _maximumAutomaticRedirections)
+                        throw NewHttpException(Resources.HttpException_LimitRedirections);
+
+                    ClearRequestData();
+                    method = HttpMethod.GET;
+                    address = Response.RedirectAddress;
+                    content = null;
+                    continue;
+                }
+
+                _redirectionCount = 0;
+
+                #endregion
+
+                return Response;
             }
-            catch (HttpException ex)
-            {
-                if (CanReconnect())
-                    return ReconnectAfterFail();
-
-                throw;
-            }
-
-            if (createdNewConnection)
-                _keepAliveRequestCount = 1;
-            else
-                _keepAliveRequestCount++;
-
-            #region Отправка запроса
-
-            try
-            {
-                SendRequestData(address, method);
-            }
-            catch (SecurityException ex)
-            {
-                throw NewHttpException(Resources.HttpException_FailedSendRequest, ex, HttpExceptionStatus.SendFailure);
-            }
-            catch (IOException ex)
-            {
-                if (CanReconnect())
-                    return ReconnectAfterFail();
-
-                throw NewHttpException(Resources.HttpException_FailedSendRequest, ex, HttpExceptionStatus.SendFailure);
-            }
-
-            #endregion
-
-            #region Загрузка заголовков ответа
-
-            try
-            {
-                ReceiveResponseHeaders(method);
-            }
-            catch (HttpException ex)
-            {
-                if (CanReconnect())
-                    return ReconnectAfterFail();
-
-                // Если сервер оборвал постоянное соединение вернув пустой ответ, то пробуем подключиться заново.
-                // Он мог оборвать соединение потому, что достигнуто максимально допустимое кол-во запросов или вышло время простоя.
-                if (KeepAlive && !_keepAliveReconnected && !createdNewConnection && ex.EmptyMessageBody)
-                    return KeepAliveReconect();
-
-                throw;
-            }
-
-            #endregion
-
-            _response.ReconnectCount = _reconnectCount;
-
-            _reconnectCount = 0;
-            _keepAliveReconnected = false;
-            _whenConnectionIdle = DateTime.Now;
-
-            if (!IgnoreProtocolErrors)
-                CheckStatusCode(_response.StatusCode);
-
-            #region Переадресация
-
-            if (AllowAutoRedirect && _response.HasRedirect)
-            {
-                if (++_redirectionCount > _maximumAutomaticRedirections)
-                    throw NewHttpException(Resources.HttpException_LimitRedirections);
-
-                ClearRequestData();
-                return Request(HttpMethod.GET, _response.RedirectAddress, null);
-            }
-
-            _redirectionCount = 0;
-
-            #endregion
-
-            return _response;
         }
 
         private void CloseConnectionIfNeeded()
         {
-            var hasConnection = (_connection != null);
+            if (_connection == null || Response.HasError || Response.MessageBodyLoaded)
+                return;
 
-            if (hasConnection && !_response.HasError &&
-                !_response.MessageBodyLoaded)
+            try
             {
-                try
-                {
-                    _response.None();
-                }
-                catch (HttpException)
-                {
-                    Dispose();
-                }
+                Response.None();
+            }
+            catch (HttpException)
+            {
+                Dispose();
             }
         }
 
         private bool TryCreateConnectionOrUseExisting(Uri address, Uri previousAddress)
         {
-            ProxyClient proxy = GetProxy();
+            var proxy = GetProxy();
 
-            var hasConnection = (_connection != null);
-            var proxyChanged = (_currentProxy != proxy);
+            var hasConnection = _connection != null;
+            var proxyChanged = !Equals(_currentProxy, proxy);
 
             var addressChanged =
-                (previousAddress == null) ||
-                (previousAddress.Port != address.Port) ||
-                (previousAddress.Host != address.Host) ||
-                (previousAddress.Scheme != address.Scheme);
+                previousAddress == null ||
+                previousAddress.Port != address.Port ||
+                previousAddress.Host != address.Host ||
+                previousAddress.Scheme != address.Scheme;
 
             // Если нужно создать новое подключение.
-            if (!hasConnection || proxyChanged ||
-                addressChanged || _response.HasError ||
-                KeepAliveLimitIsReached())
-            {
-                _currentProxy = proxy;
+            if (hasConnection && !proxyChanged && !addressChanged && !Response.HasError && !KeepAliveLimitIsReached())
+                return false;
 
-                Dispose();
-                CreateConnection(address);
-                return true;
-            }
+            _currentProxy = proxy;
 
-            return false;
+            Dispose();
+            CreateConnection(address);
+            return true;
         }
 
         private bool KeepAliveLimitIsReached()
@@ -2700,19 +2213,17 @@ namespace Leaf.Net
                 return false;
 
             var maximumKeepAliveRequests =
-                _response.MaximumKeepAliveRequests ?? _maximumKeepAliveRequests;
+                Response.MaximumKeepAliveRequests ?? _maximumKeepAliveRequests;
 
             if (_keepAliveRequestCount >= maximumKeepAliveRequests)
                 return true;
 
             var keepAliveTimeout =
-                _response.KeepAliveTimeout ?? _keepAliveTimeout;
+                Response.KeepAliveTimeout ?? _keepAliveTimeout;
 
             var timeLimit = _whenConnectionIdle.AddMilliseconds(keepAliveTimeout);
-            if (timeLimit < DateTime.Now)
-                return true;
 
-            return false;
+            return timeLimit < DateTime.Now;
         }
 
         private void SendRequestData(Uri uri, HttpMethod method)
@@ -2720,7 +2231,7 @@ namespace Leaf.Net
             var contentLength = 0L;
             var contentType = string.Empty;
 
-            if (CanContainsRequestBody(method) && (_content != null))
+            if (CanContainsRequestBody(method) && _content != null)
             {
                 contentType = _content.ContentType;
                 contentLength = _content.CalculateContentLength();
@@ -2751,15 +2262,12 @@ namespace Leaf.Net
             _canReportBytesReceived = false;
 
             _bytesReceived = 0;
-            _totalBytesReceived = _response.LoadResponse(method);
+            _totalBytesReceived = Response.LoadResponse(method);
 
             _canReportBytesReceived = true;
         }
 
-        private bool CanReconnect()
-        {
-            return Reconnect && (_reconnectCount < _reconnectLimit);
-        }
+        private bool CanReconnect() => Reconnect && _reconnectCount < _reconnectLimit;
 
         private HttpResponse ReconnectAfterFail()
         {
@@ -2781,27 +2289,26 @@ namespace Leaf.Net
         {
             var statusCodeNum = (int)statusCode;
 
-            if ((statusCodeNum >= 400) && (statusCodeNum < 500))
+            if (statusCodeNum >= 400 && statusCodeNum < 500)
             {
                 throw new HttpException(string.Format(
                     Resources.HttpException_ClientError, statusCodeNum),
-                    HttpExceptionStatus.ProtocolError, _response.StatusCode);
+                    HttpExceptionStatus.ProtocolError, Response.StatusCode);
             }
 
             if (statusCodeNum >= 500)
             {
                 throw new HttpException(string.Format(
                     Resources.HttpException_SeverError, statusCodeNum),
-                    HttpExceptionStatus.ProtocolError, _response.StatusCode);
+                    HttpExceptionStatus.ProtocolError, Response.StatusCode);
             }
         }
 
-        private bool CanContainsRequestBody(HttpMethod method)
+        private static bool CanContainsRequestBody(HttpMethod method)
         {
-            return
-                (method == HttpMethod.PUT) ||
-                (method == HttpMethod.POST) ||
-                (method == HttpMethod.DELETE);
+            return method == HttpMethod.PUT 
+                || method == HttpMethod.POST 
+                || method == HttpMethod.DELETE;
         }
 
         #endregion
@@ -2810,33 +2317,32 @@ namespace Leaf.Net
 
         private ProxyClient GetProxy()
         {
-            if (DisableProxyForLocalAddress)
+            if (!DisableProxyForLocalAddress)
+                return Proxy ?? GlobalProxy;
+
+            try
             {
-                try
-                {
-                    var checkIp = IPAddress.Parse("127.0.0.1");
-                    IPAddress[] ips = Dns.GetHostAddresses(Address.Host);
+                var checkIp = IPAddress.Parse("127.0.0.1");
+                var ips = Dns.GetHostAddresses(Address.Host);
 
-                    foreach (var ip in ips)
-                    {
-                        if (ip.Equals(checkIp))
-                        {
-                            return null;
-                        }
-                    }
-                }
-                catch (Exception ex)
+                // Using loop for because it's faster
+                // ReSharper disable once ForCanBeConvertedToForeach
+                // ReSharper disable once LoopCanBeConvertedToQuery
+                for (var i = 0; i < ips.Length; i++)
                 {
-                    if (ex is SocketException || ex is ArgumentException)
-                    {
-                        throw NewHttpException(
-                            Resources.HttpException_FailedGetHostAddresses, ex);
-                    }
-
-                    throw;
+                    var ip = ips[i];
+                    if (ip.Equals(checkIp))
+                        return null;
                 }
             }
-            
+            catch (Exception ex)
+            {
+                if (ex is SocketException || ex is ArgumentException)
+                    throw NewHttpException(Resources.HttpException_FailedGetHostAddresses, ex);
+
+                throw;
+            }
+
             return Proxy ?? GlobalProxy;
         }
 
@@ -2855,21 +2361,18 @@ namespace Leaf.Net
 
                 try
                 {
-                    tcpClient.BeginConnect(host, port, new AsyncCallback(
-                        (ar) =>
+                    tcpClient.BeginConnect(host, port, ar => {
+                        try
                         {
-                            try
-                            {
-                                tcpClient.EndConnect(ar);
-                            }
-                            catch (Exception ex)
-                            {
-                                connectException = ex;
-                            }
+                            tcpClient.EndConnect(ar);
+                        }
+                        catch (Exception ex)
+                        {
+                            connectException = ex;
+                        }
 
-                            connectDoneEvent.Set();
-                        }), tcpClient
-                    );
+                        connectDoneEvent.Set();
+                    }, tcpClient);
                 }
                 #region Catch's
 
@@ -2878,9 +2381,7 @@ namespace Leaf.Net
                     tcpClient.Close();
 
                     if (ex is SocketException || ex is SecurityException)
-                    {
                         throw NewHttpException(Resources.HttpException_FailedConnect, ex, HttpExceptionStatus.ConnectFailure);
-                    }
 
                     throw;
                 }
@@ -2898,9 +2399,7 @@ namespace Leaf.Net
                     tcpClient.Close();
 
                     if (connectException is SocketException)
-                    {
                         throw NewHttpException(Resources.HttpException_FailedConnect, connectException, HttpExceptionStatus.ConnectFailure);
-                    }
 
                     throw connectException;
                 }
@@ -2941,16 +2440,8 @@ namespace Leaf.Net
             {
                 try
                 {
-                    SslStream sslStream;
-
-                    if (SslCertificateValidatorCallback == null)
-                    {
-                        sslStream = new SslStream(_connectionNetworkStream, false, Http.AcceptAllCertificationsCallback);
-                    }
-                    else
-                    {
-                        sslStream = new SslStream(_connectionNetworkStream, false, SslCertificateValidatorCallback);
-                    }
+                    var sslStream = new SslStream(_connectionNetworkStream, false,
+                        SslCertificateValidatorCallback ?? Http.AcceptAllCertificationsCallback);
 
                     sslStream.AuthenticateAsClient(address.Host);
                     _connectionCommonStream = sslStream;
@@ -2958,36 +2449,28 @@ namespace Leaf.Net
                 catch (Exception ex)
                 {
                     if (ex is IOException || ex is AuthenticationException)
-                    {
-                        throw NewHttpException(Resources.HttpException_FailedSslConnect, ex, HttpExceptionStatus.ConnectFailure);
-                    }
+                        throw NewHttpException(Resources.HttpException_FailedSslConnect, ex,
+                            HttpExceptionStatus.ConnectFailure);
 
                     throw;
                 }
             }
             else
-            {
                 _connectionCommonStream = _connectionNetworkStream;
-            }
 
-            if (_uploadProgressChangedHandler != null ||
-                _downloadProgressChangedHandler != null)
-            {
-                var httpWraperStream = new HttpWraperStream(
-                    _connectionCommonStream, _connection.SendBufferSize);
+            if (UploadProgressChangedHandler == null && DownloadProgressChangedHandler == null)
+                return;
 
-                if (_uploadProgressChangedHandler != null)
-                {
-                    httpWraperStream.BytesWriteCallback = ReportBytesSent;
-                }
+            var httpWraperStream = new HttpWraperStream(
+                _connectionCommonStream, _connection.SendBufferSize);
 
-                if (_downloadProgressChangedHandler != null)
-                {
-                    httpWraperStream.BytesReadCallback = ReportBytesReceived;
-                }
+            if (UploadProgressChangedHandler != null)
+                httpWraperStream.BytesWriteCallback = ReportBytesSent;
 
-                _connectionCommonStream = httpWraperStream;
-            }
+            if (DownloadProgressChangedHandler != null)
+                httpWraperStream.BytesReadCallback = ReportBytesReceived;
+
+            _connectionCommonStream = httpWraperStream;
         }
 
         #endregion
@@ -2996,8 +2479,7 @@ namespace Leaf.Net
 
         private string GenerateStartingLine(HttpMethod method)
         {
-            string query;
-            query = Address.PathAndQuery;
+            string query = Address.PathAndQuery;
             /*
             if (_currentProxy != null &&
                 (_currentProxy.Type == ProxyType.Http || _currentProxy.Type == ProxyType.Chain))
@@ -3009,8 +2491,7 @@ namespace Leaf.Net
                 query = Address.PathAndQuery;
             }
             */
-            return string.Format("{0} {1} HTTP/{2}\r\n",
-                method, query, ProtocolVersion);
+            return $"{method} {query} HTTP/{ProtocolVersion}\r\n";
         }
 
         // Есть 3 типа заголовков, которые могут перекрываться другими. Вот порядок их установки:
@@ -3026,6 +2507,7 @@ namespace Leaf.Net
             if (_temporaryHeaders != null && _temporaryHeaders.Count > 0)
                 MergeHeaders(headers, _temporaryHeaders);
 
+            // ReSharper disable once InvertIf
             if (Cookies != null && Cookies.Count != 0 && !headers.ContainsKey("Cookie"))
             {
                 //Cookies.RemoveExpired();
@@ -3033,6 +2515,7 @@ namespace Leaf.Net
                 if (!string.IsNullOrEmpty(cookies))
                     headers["Cookie"] = cookies;
             }
+
             return ToHeadersString(headers);
         }
 
@@ -3045,7 +2528,7 @@ namespace Leaf.Net
             if (Address.IsDefaultPort)
                 headers["Host"] = Address.Host;
             else
-                headers["Host"] = string.Format("{0}:{1}", Address.Host, Address.Port);
+                headers["Host"] = $"{Address.Host}:{Address.Port}";
 
             #endregion
 
@@ -3054,13 +2537,9 @@ namespace Leaf.Net
             HttpProxyClient httpProxy = null;
 
             if (_currentProxy != null && _currentProxy.Type == ProxyType.Http)
-            {
                 httpProxy = _currentProxy as HttpProxyClient;
-            }
             else if (_currentProxy != null && _currentProxy.Type == ProxyType.Chain)
-            {
                 httpProxy = FindHttpProxyInChain(_currentProxy as ChainProxyClient);
-            }
 
             if (httpProxy != null)
             {
@@ -3069,11 +2548,8 @@ namespace Leaf.Net
                 else
                     headers["Proxy-Connection"] = "close";
 
-                if (!string.IsNullOrEmpty(httpProxy.Username) ||
-                    !string.IsNullOrEmpty(httpProxy.Password))
-                {
+                if (!string.IsNullOrEmpty(httpProxy.Username) || !string.IsNullOrEmpty(httpProxy.Password))
                     headers["Proxy-Authorization"] = GetProxyAuthorizationHeader(httpProxy);
-                }
             }
             else
             {
@@ -3084,9 +2560,7 @@ namespace Leaf.Net
             }
 
             if (!string.IsNullOrEmpty(Username) || !string.IsNullOrEmpty(Password))
-            {
                 headers["Authorization"] = GetAuthorizationHeader();
-            }
 
             #endregion
 
@@ -3101,12 +2575,12 @@ namespace Leaf.Net
             if (CharacterSet != null)
                 headers["Accept-Charset"] = GetCharsetHeader();
 
+
+            // ReSharper disable once InvertIf
             if (CanContainsRequestBody(method))
             {
                 if (contentLength > 0)
-                {
                     headers["Content-Type"] = contentType;
-                }
 
                 headers["Content-Length"] = contentLength.ToString();
             }
@@ -3121,67 +2595,47 @@ namespace Leaf.Net
         private string GetAuthorizationHeader()
         {
             string data = Convert.ToBase64String(Encoding.UTF8.GetBytes(
-                string.Format("{0}:{1}", Username, Password)));
+                $"{Username}:{Password}"));
 
-            return string.Format("Basic {0}", data);
+            return "Basic " + data;
         }
 
         private string GetProxyAuthorizationHeader(HttpProxyClient httpProxy)
         {
             string data = Convert.ToBase64String(Encoding.UTF8.GetBytes(
-                string.Format("{0}:{1}", httpProxy.Username, httpProxy.Password)));
+                $"{httpProxy.Username}:{httpProxy.Password}"));
 
-            return string.Format("Basic {0}", data);
+            return "Basic " + data;
         }
 
         private string GetLanguageHeader()
         {
-            string cultureName;
-
-            if (Culture != null)
-                cultureName = Culture.Name;
-            else
-                cultureName = CultureInfo.CurrentCulture.Name;
-
-            if (cultureName.StartsWith("en"))
-                return cultureName;
-
-            return string.Format("{0},{1};q=0.8,en-US;q=0.6,en;q=0.4",
-                cultureName, cultureName.Substring(0, 2));
+            string cultureName = Culture?.Name ?? CultureInfo.CurrentCulture.Name;
+            return cultureName.StartsWith("en") ? cultureName : $"{cultureName},{cultureName.Substring(0, 2)};q=0.8,en-US;q=0.6,en;q=0.4";
         }
 
         private string GetCharsetHeader()
         {
-            if (CharacterSet == Encoding.UTF8)
-            {
+            if (Equals(CharacterSet, Encoding.UTF8))
                 return "utf-8;q=0.7,*;q=0.3";
-            }
 
-            string charsetName;
+            string charsetName = CharacterSet?.WebName ?? Encoding.Default.WebName;
 
-            if (CharacterSet == null)
-            {
-                charsetName = Encoding.Default.WebName;
-            }
-            else
-            {
-                charsetName = CharacterSet.WebName;
-            }
-
-            return string.Format("{0},utf-8;q=0.7,*;q=0.3", charsetName);
+            return $"{charsetName},utf-8;q=0.7,*;q=0.3";
         }
 
-        private void MergeHeaders(Dictionary<string, string> destination, Dictionary<string, string> source)
+        private static void MergeHeaders(Dictionary<string, string> destination, Dictionary<string, string> source)
         {
+            if (destination == null)
+                throw new ArgumentNullException(nameof(destination));
+
             foreach (var sourceItem in source)
-            {
                 destination[sourceItem.Key] = sourceItem.Value;
-            }
         }
 
         #endregion
 
-        private HttpProxyClient FindHttpProxyInChain(ChainProxyClient chainProxy)
+        private static HttpProxyClient FindHttpProxyInChain(ChainProxyClient chainProxy)
         {
             HttpProxyClient foundProxy = null;
 
@@ -3189,40 +2643,45 @@ namespace Leaf.Net
             // В приоритете найти прокси, который требует авторизацию.
             foreach (var proxy in chainProxy.Proxies)
             {
-                if (proxy.Type == ProxyType.Http)
-                {
-                    foundProxy = proxy as HttpProxyClient;
+                if (proxy == null)
+                    continue;
 
-                    if (!string.IsNullOrEmpty(foundProxy.Username) ||
-                        !string.IsNullOrEmpty(foundProxy.Password))
-                    {
-                        return foundProxy;
-                    }
-                }
-                else if (proxy.Type == ProxyType.Chain)
+                // ReSharper disable once SwitchStatementMissingSomeCases
+                switch (proxy.Type)
                 {
-                    HttpProxyClient foundDeepProxy =
-                        FindHttpProxyInChain(proxy as ChainProxyClient);
+                    case ProxyType.Http:
+                        foundProxy = proxy as HttpProxyClient;
+                        if (foundProxy == null)
+                            continue;
 
-                    if (foundDeepProxy != null &&
-                        (!string.IsNullOrEmpty(foundDeepProxy.Username) ||
-                        !string.IsNullOrEmpty(foundDeepProxy.Password)))
-                    {
-                        return foundDeepProxy;
-                    }
+                        if (!string.IsNullOrEmpty(foundProxy.Username) || !string.IsNullOrEmpty(foundProxy.Password))
+                            return foundProxy;
+
+                        break;
+                    case ProxyType.Chain:
+                        var foundDeepProxy = FindHttpProxyInChain(proxy as ChainProxyClient);
+                        if (foundDeepProxy == null)
+                            continue;
+                        
+                        bool hasCredentials = 
+                            !string.IsNullOrEmpty(foundDeepProxy.Username) ||
+                            !string.IsNullOrEmpty(foundDeepProxy.Password);
+
+                        if (hasCredentials)
+                            return foundDeepProxy;
+
+                        break;
                 }
             }
 
             return foundProxy;
         }
 
-        private string ToHeadersString(Dictionary<string, string> headers)
+        private static string ToHeadersString(Dictionary<string, string> headers)
         {
             var headersBuilder = new StringBuilder();
             foreach (var header in headers)
-            {
                 headersBuilder.AppendFormat("{0}: {1}\r\n", header.Key, header.Value);
-            }
 
             headersBuilder.AppendLine();
             return headersBuilder.ToString();
@@ -3252,10 +2711,8 @@ namespace Leaf.Net
         }
 
         // Проверяет, можно ли задавать этот заголовок.
-        private bool IsClosedHeader(string name)
-        {
-            return _closedHeaders.Contains(name, StringComparer.OrdinalIgnoreCase);
-        }
+        private static bool IsClosedHeader(string name) 
+            => ClosedHeaders.Contains(name, StringComparer.OrdinalIgnoreCase);
 
         private void ClearRequestData()
         {
