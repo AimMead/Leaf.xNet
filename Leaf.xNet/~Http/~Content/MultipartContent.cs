@@ -9,34 +9,66 @@ namespace Leaf.xNet
 {
     /// <inheritdoc cref="HttpContent" />
     /// <summary>
-    /// Представляет тело запроса в виде состовного содержимого.
+    ///     Представляет тело запроса в виде состовного содержимого.
     /// </summary>
     public class MultipartContent : HttpContent, IEnumerable<HttpContent>
     {
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            ThrowIfDisposed();
+
+            return GetEnumerator();
+        }
+
+        /// <inheritdoc />
+        /// <summary>
+        ///     Освобождает неуправляемые (а при необходимости и управляемые) ресурсы, используемые объектом
+        ///     <see cref="T:Leaf.xNet.HttpContent" />.
+        /// </summary>
+        /// <param name="disposing">
+        ///     Значение <see langword="true" /> позволяет освободить управляемые и неуправляемые ресурсы;
+        ///     значение <see langword="false" /> позволяет освободить только неуправляемые ресурсы.
+        /// </param>
+        protected override void Dispose(bool disposing)
+        {
+            if ( !disposing || _elements == null )
+            {
+                return;
+            }
+
+            foreach ( var element in _elements )
+            {
+                element.Content.Dispose();
+            }
+
+            _elements = null;
+        }
+
         private sealed class Element
         {
+            public bool IsFieldFile() { return FileName != null; }
+
             #region Поля (открытые)
 
             public string Name;
+
             public string FileName;
 
             public HttpContent Content;
 
+            public Dictionary<string, string> Headers;
+
             #endregion
-
-
-            public bool IsFieldFile()
-            {
-                return FileName != null;
-            }
         }
-
 
         #region Константы (закрытые)
 
         private const int FieldTemplateSize = 43;
+
         private const int FieldFileTemplateSize = 72;
+
         private const string FieldTemplate = "Content-Disposition: form-data; name=\"{0}\"\r\n\r\n";
+
         private const string FieldFileTemplate = "Content-Disposition: form-data; name=\"{0}\"; filename=\"{1}\"\r\nContent-Type: {2}\r\n\r\n";
 
         #endregion
@@ -44,40 +76,51 @@ namespace Leaf.xNet
         #region Поля (закрытые)
 
         private readonly string _boundary;
+
         private List<Element> _elements = new List<Element>();
 
         #endregion
-
 
         #region Конструкторы (открытые)
 
         /// <inheritdoc />
         /// <summary>
-        /// Инициализирует новый экземпляр класса <see cref="T:Leaf.xNet.MultipartContent" />.
+        ///     Инициализирует новый экземпляр класса <see cref="T:Leaf.xNet.MultipartContent" />.
         /// </summary>
         // ReSharper disable once UnusedMember.Global
-        public MultipartContent()
-            : this("----------------" + GetRandomString(16)) { }
+        public MultipartContent() : this("----------------" + GetRandomString(16)) { }
 
         /// <summary>
-        /// Инициализирует новый экземпляр класса <see cref="MultipartContent"/>.
+        ///     Инициализирует новый экземпляр класса <see cref="MultipartContent" />.
         /// </summary>
         /// <param name="boundary">Граница для отделения составных частей содержимого.</param>
-        /// <exception cref="System.ArgumentNullException">Значение параметра <paramref name="boundary"/> равно <see langword="null"/>.</exception>
-        /// <exception cref="System.ArgumentException">Значение параметра <paramref name="boundary"/> является пустой строкой.</exception>
-        /// <exception cref="System.ArgumentOutOfRangeException">Значение параметра <paramref name="boundary"/> имеет длину более 70 символов.</exception>
+        /// <exception cref="System.ArgumentNullException">
+        ///     Значение параметра <paramref name="boundary" /> равно
+        ///     <see langword="null" />.
+        /// </exception>
+        /// <exception cref="System.ArgumentException">Значение параметра <paramref name="boundary" /> является пустой строкой.</exception>
+        /// <exception cref="System.ArgumentOutOfRangeException">
+        ///     Значение параметра <paramref name="boundary" /> имеет длину более
+        ///     70 символов.
+        /// </exception>
         public MultipartContent(string boundary)
         {
             #region Проверка параметров
 
-            if (boundary == null)
+            if ( boundary == null )
+            {
                 throw new ArgumentNullException(nameof(boundary));
+            }
 
-            if (boundary.Length == 0)
+            if ( boundary.Length == 0 )
+            {
                 throw ExceptionHelper.EmptyString(nameof(boundary));
+            }
 
-            if (boundary.Length > 70)
+            if ( boundary.Length > 70 )
+            {
                 throw ExceptionHelper.CanNotBeGreater(nameof(boundary), 70);
+            }
 
             #endregion
 
@@ -88,95 +131,108 @@ namespace Leaf.xNet
 
         #endregion
 
-
         #region Методы (открытые)
 
         /// <summary>
-        /// Добавляет новый элемент состовного содержимого тела запроса.
+        ///     Добавляет новый элемент состовного содержимого тела запроса.
         /// </summary>
         /// <param name="content">Значение элемента.</param>
         /// <param name="name">Имя элемента.</param>
         /// <exception cref="System.ObjectDisposedException">Текущий экземпляр уже был удалён.</exception>
         /// <exception cref="System.ArgumentNullException">
-        /// Значение параметра <paramref name="content"/> равно <see langword="null"/>.
-        /// -или-
-        /// Значение параметра <paramref name="name"/> равно <see langword="null"/>.
+        ///     Значение параметра <paramref name="content" /> равно <see langword="null" />.
+        ///     -или-
+        ///     Значение параметра <paramref name="name" /> равно <see langword="null" />.
         /// </exception>
-        /// <exception cref="System.ArgumentException">Значение параметра <paramref name="name"/> является пустой строкой.</exception>
+        /// <exception cref="System.ArgumentException">Значение параметра <paramref name="name" /> является пустой строкой.</exception>
         // ReSharper disable once UnusedMember.Global
         public void Add(HttpContent content, string name)
         {
             #region Проверка параметров
 
-            if (content == null)
+            if ( content == null )
+            {
                 throw new ArgumentNullException(nameof(content));
+            }
 
-            if (name == null)
+            if ( name == null )
+            {
                 throw new ArgumentNullException(nameof(name));
+            }
 
-            if (name.Length == 0)
+            if ( name.Length == 0 )
+            {
                 throw ExceptionHelper.EmptyString(nameof(name));
+            }
 
             #endregion
 
             var element = new Element
-            {
-                Name = name,
-                Content = content
-            };
+                          {
+                              Name    = name,
+                              Content = content
+                          };
 
             _elements.Add(element);
         }
 
         /// <summary>
-        /// Добавляет новый элемент состовного содержимого тела запроса.
+        ///     Добавляет новый элемент состовного содержимого тела запроса.
         /// </summary>
         /// <param name="content">Значение элемента.</param>
         /// <param name="name">Имя элемента.</param>
         /// <param name="fileName">Имя файла элемента.</param>
         /// <exception cref="System.ObjectDisposedException">Текущий экземпляр уже был удалён.</exception>
         /// <exception cref="System.ArgumentNullException">
-        /// Значение параметра <paramref name="content"/> равно <see langword="null"/>.
-        /// -или-
-        /// Значение параметра <paramref name="name"/> равно <see langword="null"/>.
-        /// -или-
-        /// Значение параметра <paramref name="fileName"/> равно <see langword="null"/>.
+        ///     Значение параметра <paramref name="content" /> равно <see langword="null" />.
+        ///     -или-
+        ///     Значение параметра <paramref name="name" /> равно <see langword="null" />.
+        ///     -или-
+        ///     Значение параметра <paramref name="fileName" /> равно <see langword="null" />.
         /// </exception>
-        /// <exception cref="System.ArgumentException">Значение параметра <paramref name="name"/> является пустой строкой.</exception>
+        /// <exception cref="System.ArgumentException">Значение параметра <paramref name="name" /> является пустой строкой.</exception>
         // ReSharper disable once UnusedMember.Global
-        public void Add(HttpContent content, string name, string fileName)
+        public void Add(HttpContent content, string name, string fileName, Dictionary<string, string> headers)
         {
             #region Проверка параметров
 
-            if (content == null)
+            if ( content == null )
+            {
                 throw new ArgumentNullException(nameof(content));
+            }
 
-            if (name == null)
+            if ( name == null )
+            {
                 throw new ArgumentNullException(nameof(name));
+            }
 
-            if (name.Length == 0)
+            if ( name.Length == 0 )
+            {
                 throw ExceptionHelper.EmptyString(nameof(name));
+            }
 
-            if (fileName == null)
+            if ( fileName == null )
+            {
                 throw new ArgumentNullException(nameof(fileName));
+            }
 
             #endregion
 
-            content.ContentType = Http.DetermineMediaType(
-                Path.GetExtension(fileName));
+            content.ContentType = Http.DetermineMediaType(Path.GetExtension(fileName));
 
             var element = new Element
-            {
-                Name = name,
-                FileName = fileName,
-                Content = content
-            };
+                          {
+                              Name     = name,
+                              FileName = fileName,
+                              Content  = content,
+                              Headers  = headers
+                          };
 
             _elements.Add(element);
         }
 
         /// <summary>
-        /// Добавляет новый элемент состовного содержимого тела запроса.
+        ///     Добавляет новый элемент состовного содержимого тела запроса.
         /// </summary>
         /// <param name="content">Значение элемента.</param>
         /// <param name="name">Имя элемента.</param>
@@ -184,52 +240,63 @@ namespace Leaf.xNet
         /// <param name="contentType">MIME-тип контента.</param>
         /// <exception cref="System.ObjectDisposedException">Текущий экземпляр уже был удалён.</exception>
         /// <exception cref="System.ArgumentNullException">
-        /// Значение параметра <paramref name="content"/> равно <see langword="null"/>.
-        /// -или-
-        /// Значение параметра <paramref name="name"/> равно <see langword="null"/>.
-        /// -или-
-        /// Значение параметра <paramref name="fileName"/> равно <see langword="null"/>.
-        /// -или-
-        /// Значение параметра <paramref name="contentType"/> равно <see langword="null"/>.
+        ///     Значение параметра <paramref name="content" /> равно <see langword="null" />.
+        ///     -или-
+        ///     Значение параметра <paramref name="name" /> равно <see langword="null" />.
+        ///     -или-
+        ///     Значение параметра <paramref name="fileName" /> равно <see langword="null" />.
+        ///     -или-
+        ///     Значение параметра <paramref name="contentType" /> равно <see langword="null" />.
         /// </exception>
-        /// <exception cref="System.ArgumentException">Значение параметра <paramref name="name"/> является пустой строкой.</exception>
+        /// <exception cref="System.ArgumentException">Значение параметра <paramref name="name" /> является пустой строкой.</exception>
         // ReSharper disable once UnusedMember.Global
-        public void Add(HttpContent content, string name, string fileName, string contentType)
+        public void Add(HttpContent content, string name, string fileName, Dictionary<string, string> headers, string contentType)
         {
             #region Проверка параметров
 
-            if (content == null)
+            if ( content == null )
+            {
                 throw new ArgumentNullException(nameof(content));
+            }
 
-            if (name == null)
+            if ( name == null )
+            {
                 throw new ArgumentNullException(nameof(name));
+            }
 
-            if (name.Length == 0)
+            if ( name.Length == 0 )
+            {
                 throw ExceptionHelper.EmptyString(nameof(name));
+            }
 
-            if (fileName == null)
+            if ( fileName == null )
+            {
                 throw new ArgumentNullException(nameof(fileName));
+            }
 
-            if (contentType == null)
+            if ( contentType == null )
+            {
                 throw new ArgumentNullException(nameof(contentType));
+            }
 
             #endregion
 
             content.ContentType = contentType;
 
             var element = new Element
-            {
-                Name = name,
-                FileName = fileName,
-                Content = content
-            };
+                          {
+                              Name     = name,
+                              FileName = fileName,
+                              Content  = content,
+                              Headers  = headers
+                          };
 
             _elements.Add(element);
         }
 
         /// <inheritdoc />
         /// <summary>
-        /// Подсчитывает и возвращает длину тела запроса в байтах.
+        ///     Подсчитывает и возвращает длину тела запроса в байтах.
         /// </summary>
         /// <returns>Длина тела запроса в байтах.</returns>
         /// <exception cref="T:System.ObjectDisposedException">Текущий экземпляр уже был удалён.</exception>
@@ -239,16 +306,23 @@ namespace Leaf.xNet
 
             long length = 0;
 
-            foreach (var element in _elements)
+            foreach ( var element in _elements )
             {
                 length += element.Content.CalculateContentLength();
 
-                if (element.IsFieldFile())
+                if ( element.IsFieldFile() )
                 {
                     length += FieldFileTemplateSize;
                     length += element.Name.Length;
                     length += element.FileName.Length;
                     length += element.Content.ContentType.Length;
+
+                    foreach ( var header in element.Headers )
+                    {
+                        // (key) + (: ) + (value) + (\r\n)
+                        length += header.Key.Length + 4;
+                        length += header.Value.Length;
+                    }
                 }
                 else
                 {
@@ -268,41 +342,56 @@ namespace Leaf.xNet
 
         /// <inheritdoc />
         /// <summary>
-        /// Записывает данные тела запроса в поток.
+        ///     Записывает данные тела запроса в поток.
         /// </summary>
         /// <param name="stream">Поток, куда будут записаны данные тела запроса.</param>
         /// <exception cref="T:System.ObjectDisposedException">Текущий экземпляр уже был удалён.</exception>
-        /// <exception cref="T:System.ArgumentNullException">Значение параметра <paramref name="stream" /> равно <see langword="null" />.</exception>
+        /// <exception cref="T:System.ArgumentNullException">
+        ///     Значение параметра <paramref name="stream" /> равно
+        ///     <see langword="null" />.
+        /// </exception>
         public override void WriteTo(Stream stream)
         {
             ThrowIfDisposed();
 
             #region Проверка параметров
 
-            if (stream == null)
+            if ( stream == null )
+            {
                 throw new ArgumentNullException(nameof(stream));
+            }
 
             #endregion
 
-            var newLineBytes = Encoding.ASCII.GetBytes("\r\n");
+            var newLineBytes  = Encoding.ASCII.GetBytes("\r\n");
             var boundaryBytes = Encoding.ASCII.GetBytes("--" + _boundary + "\r\n");
 
-            foreach (var element in _elements)
+            foreach ( var element in _elements )
             {
                 stream.Write(boundaryBytes, 0, boundaryBytes.Length);
 
                 string field;
 
-                if (element.IsFieldFile())
+                if ( element.IsFieldFile() )
                 {
-                    field = string.Format(
-                        FieldFileTemplate, element.Name, element.FileName, element.Content.ContentType);
+                    field = string.Format(FieldFileTemplate, element.Name, element.FileName, element.Content.ContentType);
                 }
                 else
+                {
                     field = string.Format(FieldTemplate, element.Name);
+                }
 
                 var fieldBytes = Encoding.ASCII.GetBytes(field);
                 stream.Write(fieldBytes, 0, fieldBytes.Length);
+
+                if ( element.IsFieldFile() )
+                {
+                    foreach ( var header in element.Headers )
+                    {
+                        var headerBytes = Encoding.ASCII.GetBytes($"{header.Key}: {header.Value}\r\n");
+                        stream.Write(headerBytes, 0, headerBytes.Length);
+                    }
+                }
 
                 element.Content.WriteTo(stream);
                 stream.Write(newLineBytes, 0, newLineBytes.Length);
@@ -314,7 +403,7 @@ namespace Leaf.xNet
 
         /// <inheritdoc />
         /// <summary>
-        /// Возвращает перечеслитель элементов составного содержимого.
+        ///     Возвращает перечеслитель элементов составного содержимого.
         /// </summary>
         /// <returns></returns>
         /// <exception cref="T:System.ObjectDisposedException">Текущий экземпляр уже был удалён.</exception>
@@ -322,36 +411,11 @@ namespace Leaf.xNet
         {
             ThrowIfDisposed();
 
-            return _elements.Select(e => e.Content).GetEnumerator();
+            return _elements.Select(e => e.Content)
+                            .GetEnumerator();
         }
 
         #endregion
-
-
-        /// <inheritdoc />
-        /// <summary>
-        /// Освобождает неуправляемые (а при необходимости и управляемые) ресурсы, используемые объектом <see cref="T:Leaf.xNet.HttpContent" />.
-        /// </summary>
-        /// <param name="disposing">Значение <see langword="true" /> позволяет освободить управляемые и неуправляемые ресурсы; значение <see langword="false" /> позволяет освободить только неуправляемые ресурсы.</param>
-        protected override void Dispose(bool disposing)
-        {
-            if (!disposing || _elements == null)
-                return;
-
-            foreach (var element in _elements)
-                element.Content.Dispose();
-
-            _elements = null;
-        }
-
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            ThrowIfDisposed();
-
-            return GetEnumerator();
-        }
-
 
         #region Методы (закрытые)
 
@@ -359,20 +423,23 @@ namespace Leaf.xNet
         {
             var strBuilder = new StringBuilder(length);
 
-            for (int i = 0; i < length; ++i)
+            for ( var i = 0; i < length; ++i )
             {
-                switch (Randomizer.Instance.Next(3))
+                switch ( Randomizer.Instance.Next(3) )
                 {
                     case 0:
-                        strBuilder.Append((char)Randomizer.Instance.Next(48, 58));
+                        strBuilder.Append((char) Randomizer.Instance.Next(48, 58));
+
                         break;
 
                     case 1:
-                        strBuilder.Append((char)Randomizer.Instance.Next(97, 123));
+                        strBuilder.Append((char) Randomizer.Instance.Next(97, 123));
+
                         break;
 
                     default:
-                        strBuilder.Append((char)Randomizer.Instance.Next(65, 91));
+                        strBuilder.Append((char) Randomizer.Instance.Next(65, 91));
+
                         break;
                 }
             }
@@ -382,8 +449,10 @@ namespace Leaf.xNet
 
         private void ThrowIfDisposed()
         {
-            if (_elements == null)
+            if ( _elements == null )
+            {
                 throw new ObjectDisposedException("MultipartContent");
+            }
         }
 
         #endregion

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Run configurations -->
   
@@ -11,7 +11,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Leaf.xNet</RootNamespace>
     <AssemblyName>Leaf.xNet</AssemblyName>
-    <TargetFrameworks>net462;net471;net472;netcoreapp2.0;netcoreapp2.1</TargetFrameworks>
+    <TargetFrameworks>net471</TargetFrameworks>
     <FileAlignment>512</FileAlignment>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Authors>Grand Silence</Authors>
@@ -44,7 +44,7 @@
     <RepositoryUrl>https://github.com/csharp-leaf/Leaf.xNet</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageProjectUrl>https://github.com/csharp-leaf</PackageProjectUrl>
-    <Copyright>© 2018 Developed by Grand Silence — Kelog Studio</Copyright>
+    <Copyright>� 2018 Developed by Grand Silence � Kelog Studio</Copyright>
     <PackageTags>net,http,socks,proxy,cloudflare</PackageTags>
     <PackageIconUrl>https://raw.githubusercontent.com/csharp-leaf/Leaf.Core/master/Icons/icon-300.png</PackageIconUrl>
     <NoWarn>1591</NoWarn>
